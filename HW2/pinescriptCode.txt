@@ -1,0 +1,82 @@
+//RSI-VWAP
+//@version=5
+strategy('VWAP-RSI combination', overlay=false)
+in1 = input(title='VWAP Length', defval=14)
+src = input(title='VWAP Source', defval=close)
+TP = input.float(title='Take Profit (%)', defval=10) / 100
+SL = input.float(title='Stop Loss (%)', defval=5) / 100
+rsiLength = input(14, 'RSI Length')
+rsiOverbought = input(70, title="RSI Overbought")
+rsiOversold = input(30, title="RSI Oversold")
+
+vwapValue = ta.vwap(hlc3)
+rsiValue = ta.rsi(close, rsiLength)
+// rsiValuescnd = request.security(syminfo.tickerid, "1D", ta.rsi(rsiSource, rsiLength) )
+
+// long = ta.crossover(close, vwapValue) and rsiValue < rsiOversold and rsiValuescnd < rsiOversold
+// short = ta.crossunder(close, vwapValue) and rsiValue > rsiOverbought and rsiValuescnd > rsiOverbought
+long = ta.crossover(close, vwapValue) and not (rsiValue > rsiOverbought)// and not (rsiValuescnd > rsiOverbought)
+short = ta.crossunder(close, vwapValue) and not (rsiValue < rsiOversold)// and not (rsiValuescnd < rsiOversold)
+ 
+takeProfitLong = vwapValue * (1 + TP)
+stopLossLong = vwapValue * (1 - SL)
+takeProfitShort = vwapValue * (1 - TP)
+stopLossShort = vwapValue * (1 + SL)
+
+plot(vwapValue, color=color.blue, title='VWAP', offset=0)
+hline(rsiOverbought, "Overbought", color=color.red)
+hline(rsiOversold, "Oversold", color=color.green)
+plot(rsiValue, title="RSI", color=color.yellow)
+
+if (time > timestamp(2022, 1, 1)) 
+    strategy.entry('Long', strategy.long, when=long)
+    strategy.entry('Short', strategy.short, when=short) 
+    strategy.exit('Take Profit/Stop Loss', from_entry='Long', stop=stopLossLong, limit=takeProfitLong)
+    strategy.exit('Take Profit/Stop Loss', from_entry='Short', stop=stopLossShort, limit=takeProfitShort)
+
+
+
+
+//===================================================================================================================================
+//RSI-BB
+//@version=5
+strategy(title='BollingerBand-RSI', shorttitle='BB-RSI')
+
+rsiPeriod = input.int(14, minval=1, title='RSI Period')
+priceData = input(close, title='Price Data')
+
+rsiIndicator = ta.rsi(priceData, rsiPeriod)
+plot(rsiIndicator, title='RSI', color=color.orange)
+
+// 1-day RSI
+rsiIndicatorDaily = request.security(syminfo.tickerid, "D", ta.rsi(priceData, rsiPeriod))
+plot(rsiIndicatorDaily, title='1-Day RSI', color=color.blue)
+// 1-week RSI
+rsiIndicatorHourly = request.security(syminfo.tickerid, "60", ta.rsi(priceData, rsiPeriod))
+plot(rsiIndicatorHourly, title='1-Day RSI', color=color.rgb(35, 85, 4))
+
+rsiUpperBoundary = hline(70, title='Upper Band', color=color.white)
+rsiLowerBoundary = hline(30, title='Lower Band', color=color.white)
+
+bbPeriod = input.int(20, title='Bollinger Band Period', minval=1)
+stdDeviationFactor = input.float(2.0, minval=0.001, maxval=50, title='Bollinger Band Std Dev Factor')
+bbMiddleLine = ta.sma(priceData, bbPeriod)
+bbDeviation = stdDeviationFactor * ta.stdev(priceData, bbPeriod)
+bbUpperLine = bbMiddleLine + bbDeviation
+bbLowerLine = bbMiddleLine - bbDeviation
+
+TP = input.float(10, title='Long Take Profit %', step=0.1) / 100
+SL = input.float(25, title='Long Stop Loss %', step=0.1) / 100
+
+takeProfitLevel = strategy.position_avg_price * (1 + TP)
+stopLossLevel = strategy.position_avg_price * (1 - SL)
+
+// Modified entry condition to take both RSI values into consideration
+// longEntryCondition = rsiIndicator < 30  and priceData < bbLowerLine  and rsiIndicatorDaily < 30 and rsiIndicatorHourly<30
+longEntryCondition = rsiIndicator < 30  and priceData < bbLowerLine and not(rsiIndicatorDaily >70) and not(rsiIndicatorHourly > 70)
+longExitCondition = rsiIndicator > 70
+
+if time > timestamp(2022,1,1)
+    strategy.entry('LongOrder', strategy.long, when=longEntryCondition)
+    strategy.exit('TakeProfitOrStopLoss', 'LongOrder', limit=takeProfitLevel, stop=stopLossLevel)
+    strategy.close('LongOrder', when=longExitCondition, comment='Exit')

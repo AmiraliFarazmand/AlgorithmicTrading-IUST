@@ -1,0 +1,37 @@
+//@version=4
+strategy("VWAP Crossover", overlay=true)
+// import PineCoders/VisibleChart/4
+
+in1 = input(title="VWAP Length", type = input.integer, defval=14)
+src = input(title="VWAP Source", type = input.source, defval=close)
+TP = input(title="Take Profit (%)", type = input.float, defval=10) / 100
+SL = input(title="Stop Loss (%)", type = input.float, defval=5) / 100
+
+year1 = input(title = "start year", type = input.integer, defval = 2022)
+year2 = input(title = "end year", type = input.integer, defval = 2022)
+month1 = input(title = "start month", type = input.integer, defval = 1)
+month2 = input(title = "end month", type = input.integer, defval = 2)
+day1 = input(title = "start day", type = input.integer, defval = 1)
+day2 = input(title = "end day", type = input.integer, defval = 1)
+
+// vwapValue = sma(src, in1)
+vwapValue = vwap(hlc3)
+// vwapValue = vwap(src)
+
+long = crossover(close, vwapValue)
+short = crossunder(close, vwapValue)
+
+takeProfitLong = vwapValue * (1 + TP)
+stopLossLong = vwapValue * (1 - SL)
+
+takeProfitShort = vwapValue * (1 - TP)
+stopLossShort = vwapValue * (1 + SL)
+
+plot(vwapValue, color=color.orange, title="VWAP", offset=0)
+
+if (time >= timestamp(year1, month1, day1, 00, 00) and time <=  timestamp(year2, month2, day2, 00, 00))
+    strategy.entry("Long", strategy.long, when=long)
+    strategy.entry("Short", strategy.short, when=short)
+
+    strategy.exit("Take Profit/Stop Loss", from_entry="Long", stop=stopLossLong, limit=takeProfitLong)
+    strategy.exit("Take Profit/Stop Loss", from_entry="Short", stop=stopLossShort, limit=takeProfitShort)
